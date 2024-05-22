@@ -34,12 +34,14 @@ Usage:
   powertracker [flags]
 
 Flags:
-  -c, --config string     config file (default "$HOME_DIR/.config/powertracker/config.yaml")
-  -f, --csv-file string   the path of the CSV file to write to (default "results.csv")
-  -d, --days int          number of days to compute power stats for (default 30)
-  -h, --help              help for powertracker
-  -i  --insecure          skip TLS verification
-  -o, --output string     output format (text, table, csv)
+  -c, --config string      config file (default "~/.config/powertracker/config.yaml")
+  -f, --csv-file string    the path of the CSV file to write to (default "results.csv")
+  -D, --dayColumn          add date column to output
+  -d, --days int           number of days to compute power stats for (default 30)
+  -h, --help               help for powertracker
+  -i, --insecure           skip TLS verification
+  -o, --output string      output format (text, table, csv)
+  -s, --startDate string   Start Date (YYYY-MM-DD). By default now() is used
 
 ```
 

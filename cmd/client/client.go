@@ -15,10 +15,12 @@ import (
 )
 
 type Config struct {
-	Days     int
-	Output   string
-	FilePath string
-	Insecure bool
+	Days       int
+	StartDate  string
+	Output     string
+	FilePath   string
+	Insecure   bool
+	AddDayInfo bool
 }
 
 type Client struct {
@@ -141,9 +143,18 @@ func (c *Client) ComputePowerStats() {
 	}
 
 	// Generate column headers for table/CSV
-	headers := make([]string, hoursInADay)
-	for i := range headers {
-		headers[i] = fmt.Sprintf("%d", i)
+	var headers []string
+	i := 0
+	if c.Config.AddDayInfo {
+		headers = make([]string, hoursInADay+1)
+		headers[i] = "day"
+		i++
+	} else {
+		headers = make([]string, hoursInADay)
+	}
+	for h := range [24]int{} {
+		headers[i] = fmt.Sprintf("%d", h)
+		i++
 	}
 
 	switch c.Config.Output {
@@ -184,10 +195,30 @@ func (c *Client) writeCSVFile(headers []string, results [][]float64, averages []
 		return fmt.Errorf("writing headers: %w", err)
 	}
 
-	for _, row := range results {
-		rowString := make([]string, len(row))
-		for j, val := range row {
+	var startDate time.Time
+	if (c.Config.StartDate != "") && (c.Config.StartDate != "now") {
+		startDate, err = time.Parse("2006-01-02", c.Config.StartDate)
+		if err != nil {
+			return nil
+		}
+	} else {
+		log.Info().Msgf("Using now as start date")
+		startDate = time.Now().Add(time.Duration(c.Config.Days) * -24 * time.Hour)
+	}
+	for i, row := range results {
+		var rowString []string
+		j := 0
+		if c.Config.AddDayInfo {
+			rowString = make([]string, len(row)+1)
+			rowString[j] = startDate.Add(time.Duration(i) * 24 * time.Hour).Truncate(24 * time.Hour).Format("2006-01-02")
+			j++
+		} else {
+			rowString = make([]string, len(row))
+		}
+
+		for _, val := range row {
 			rowString[j] = fmt.Sprintf("%f", val)
+			j++
 		}
 		err = writer.Write(rowString)
 		if err != nil {
@@ -195,9 +226,18 @@ func (c *Client) writeCSVFile(headers []string, results [][]float64, averages []
 		}
 	}
 
-	averageString := make([]string, len(averages))
-	for i, val := range averages {
+	var averageString []string
+	i := 0
+	if c.Config.AddDayInfo {
+		averageString = make([]string, len(averages)+1)
+		averageString[i] = "average"
+		i++
+	} else {
+		averageString = make([]string, len(averages))
+	}
+	for _, val := range averages {
 		averageString[i] = fmt.Sprintf("%f", val)
+		i++
 	}
 	err = writer.Write(averageString)
 	if err != nil {
@@ -241,18 +281,34 @@ func getResults(c *Client) ([][]float64, error) {
 	if sensorID == "" {
 		return nil, fmt.Errorf("sensor_id is required")
 	}
+	var startDate time.Time
+	var endDate time.Time
+	var err error
+	if (c.Config.StartDate != "") && (c.Config.StartDate != "now") {
+		log.Debug().Msgf("Using provided date as start date %s", c.Config.StartDate)
+		startDate, err = time.Parse("2006-01-02", c.Config.StartDate)
+		if err != nil {
+			return nil, fmt.Errorf("parsing start_date: %w", err)
+		}
+		endDate = startDate.Add(time.Duration(c.Config.Days+1) * 24 * time.Hour)
+	} else {
+		log.Info().Msgf("Using now as end date")
+		startDate = time.Now().Add(time.Duration(c.Config.Days+1) * -24 * time.Hour)
+		endDate = time.Now()
+	}
+	end := endDate.Truncate(24 * time.Hour).Format("2006-01-02T15:04:05.000Z")
 
 	for i := range results {
 		c.MessageID++
 
 		offset := time.Duration((i+1)*24) * time.Hour
-		start := time.Now().Add(-offset).Truncate(24 * time.Hour).Format("2006-01-02T15:04:05.000Z")
-
+		start := startDate.Add(offset).Truncate(24 * time.Hour).Format("2006-01-02T15:04:05.000Z")
+		log.Info().Msgf("Sending request for date %d %s", i, start)
 		msg := map[string]interface{}{
 			"id":            c.MessageID,
 			"type":          "recorder/statistics_during_period",
 			"start_time":    start,
-			"end_time":      time.Now().Truncate(24 * time.Hour).Format("2006-01-02T15:04:05.000Z"),
+			"end_time":      end,
 			"statistic_ids": []string{sensorID},
 			"period":        "hour",
 			"types":         []string{"change"},
@@ -266,7 +322,7 @@ func getResults(c *Client) ([][]float64, error) {
 		}
 
 		var data APIResponse
-		err := c.Conn.ReadJSON(&data)
+		err = c.Conn.ReadJSON(&data)
 		if err != nil {
 			return nil, fmt.Errorf("reading from websocket: %w", err)
 		}
@@ -279,6 +335,7 @@ func getResults(c *Client) ([][]float64, error) {
 			changeSlice[j] = data.Result[sensorID][j].Change
 		}
 		results[i] = changeSlice
+		log.Info().Msgf("Results: %v", changeSlice)
 	}
 	return results, nil
 }

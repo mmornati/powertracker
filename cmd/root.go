@@ -16,10 +16,12 @@ import (
 var (
 	cfgFile string
 
-	days     int
-	output   string
-	csvFile  string
-	insecure bool
+	days       int
+	startDate  string
+	output     string
+	csvFile    string
+	insecure   bool
+	addDayInfo bool
 )
 
 var rootCmd = &cobra.Command{
@@ -33,10 +35,12 @@ var rootCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		c := client.New(client.Config{
-			Days:     days,
-			Output:   output,
-			FilePath: csvFile,
-			Insecure: insecure,
+			Days:       days,
+			StartDate:  startDate,
+			Output:     output,
+			FilePath:   csvFile,
+			Insecure:   insecure,
+			AddDayInfo: addDayInfo,
 		})
 		if err := c.Connect(); err != nil {
 			log.Fatal().Msgf("connecting to websocket: %s", err.Error())
@@ -67,6 +71,8 @@ func init() {
 		rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", confDir+"/powertracker/config.yaml", "config file")
 
 		rootCmd.PersistentFlags().IntVarP(&days, "days", "d", 30, "number of days to compute power stats for")
+		rootCmd.PersistentFlags().StringVarP(&startDate, "startDate", "s", "", "Start Date (YYYY-MM-DD). By default now() is used")
+		rootCmd.PersistentFlags().BoolVarP(&addDayInfo, "dayColumn", "D", false, "add date column to output")
 		rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "", "output format (text, table, csv)")
 		rootCmd.PersistentFlags().StringVarP(&csvFile, "csv-file", "f", "results.csv", "the path of the CSV file to write to")
 		rootCmd.PersistentFlags().BoolVarP(&insecure, "insecure", "i", false, "skip TLS verification")
@@ -124,6 +130,6 @@ func promtUserConfig() error {
 
 	viper.Set("api_key", token)
 	viper.Set("url", haURL.String())
-	viper.Set("sensor", sensor)
+	viper.Set("sensor_id", sensor)
 	return nil
 }
