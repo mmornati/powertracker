@@ -22,6 +22,7 @@ var (
 	csvFile    string
 	insecure   bool
 	addDayInfo bool
+	sensor     string
 )
 
 var rootCmd = &cobra.Command{
@@ -41,6 +42,7 @@ var rootCmd = &cobra.Command{
 			FilePath:   csvFile,
 			Insecure:   insecure,
 			AddDayInfo: addDayInfo,
+			Sensor:     sensor,
 		})
 		if err := c.Connect(); err != nil {
 			log.Fatal().Msgf("connecting to websocket: %s", err.Error())
@@ -76,6 +78,7 @@ func init() {
 		rootCmd.PersistentFlags().StringVarP(&output, "output", "o", "", "output format (text, table, csv)")
 		rootCmd.PersistentFlags().StringVarP(&csvFile, "csv-file", "f", "results.csv", "the path of the CSV file to write to")
 		rootCmd.PersistentFlags().BoolVarP(&insecure, "insecure", "i", false, "skip TLS verification")
+		rootCmd.PersistentFlags().StringVarP(&sensor, "sensor", "n", "", "override the config sensor_id")
 	}
 }
 

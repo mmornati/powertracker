@@ -21,6 +21,7 @@ type Config struct {
 	FilePath   string
 	Insecure   bool
 	AddDayInfo bool
+	Sensor     string
 }
 
 type Client struct {
@@ -39,6 +40,9 @@ type APIResponse struct {
 	Success bool   `json:"success"` // Success indicates whether the response was successful or not.
 	Result  map[string][]struct {
 		Change float64 `json:"change"`
+		Mean   float64 `json:"mean"`
+		Min    float64 `json:"min"`
+		Max    float64 `json:"max"`
 		End    int64   `json:"end"`
 		Start  int64   `json:"start"`
 	} `json:"result"` // Result contains the data returned by the API.
@@ -278,6 +282,9 @@ func getResults(c *Client) ([][]float64, error) {
 	// 24 hours, each time we iterate through the a "row" of the results slice.
 	results := make([][]float64, c.Config.Days)
 	sensorID := viper.GetString("sensor_id")
+	if c.Config.Sensor != "" {
+		sensorID = c.Config.Sensor
+	}
 	if sensorID == "" {
 		return nil, fmt.Errorf("sensor_id is required")
 	}
@@ -285,14 +292,12 @@ func getResults(c *Client) ([][]float64, error) {
 	var endDate time.Time
 	var err error
 	if (c.Config.StartDate != "") && (c.Config.StartDate != "now") {
-		log.Debug().Msgf("Using provided date as start date %s", c.Config.StartDate)
 		startDate, err = time.Parse("2006-01-02", c.Config.StartDate)
 		if err != nil {
 			return nil, fmt.Errorf("parsing start_date: %w", err)
 		}
 		endDate = startDate.Add(time.Duration(c.Config.Days+1) * 24 * time.Hour)
 	} else {
-		log.Info().Msgf("Using now as end date")
 		startDate = time.Now().Add(time.Duration(c.Config.Days+1) * -24 * time.Hour)
 		endDate = time.Now()
 	}
@@ -330,6 +335,7 @@ func getResults(c *Client) ([][]float64, error) {
 		if !data.Success {
 			return nil, fmt.Errorf("api response error: %v", data.Error)
 		}
+
 		changeSlice := make([]float64, hoursInADay)
 		for j := range changeSlice {
 			changeSlice[j] = data.Result[sensorID][j].Change
